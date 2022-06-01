@@ -1,2 +1,1 @@
-# EARMfStSLAP
-Enhancing Association Rule Mining for Solving the Storage Location Assignment Problem
+# Enhancing Association Rule Mining for Solving the Storage Location Assignment Problem
