@@ -5,6 +5,7 @@ from collections import defaultdict
 import itertools
 from joblib import Parallel, delayed
 import time
+import pickle
 
 
 class ShelfIndex:
@@ -118,37 +119,6 @@ class ShelfRow:
 
 
 
-    # def set_dimensions(self):
-    #     """
-    #     Sets the dimensions and alignment of the shelf row
-    #     """
-
-    #     # Search for start and end points of the row
-    #     for shelf in self.shelves:
-    #         x, y = shelf.x, shelf.y
-    #         if x < self.x_min:
-    #             self.x_min = x
-    #         if x > self.x_max:
-    #             self.x_max = x
-    #         if y < self.y_min:
-    #             self.y_min = y
-    #         if y > self.y_max:
-    #             self.y_max = y
-
-
-    #     self.start_point = (self.x_min, self.y_min)
-    #     self.end_point = (self.x_max, self.y_max)
-
-    #     # Check if vertical or horizontal
-    #     if self.x_min == self.x_max:
-    #         self.vertical = True
-    #     if self.y_min == self.y_max:
-    #         self.horizontal = True
-
-    #     # Set row length
-    #     self.length = max(self.x_max - self.x_min, self.y_max - self.y_min)
-
-
     def set_pick_locations(self, layout):
         """
         Set the points from which articles in each shelf of this row can be picked
@@ -163,7 +133,6 @@ class ShelfRow:
         """
     
         # If start point has a free tile above it assume the entire row can be picked from above
-        
         if layout.layout_matrix[self.shelves[0].x + 1, self.shelves[0].y] == -1:
             self.aisle_direction = (1, 0)
         
@@ -530,3 +499,53 @@ class Layout:
         
 
 
+
+
+def create_layout(n_shelves_in_row=10, n_rows_x=8, n_rows_y=18, depot_location=(0,44), shelf_height=14, layout_path='../Data/layout.pkl'): # n_rows_y must be even!
+    shelves = []
+    aisle_locations = []
+    shelf_rows = []
+
+    n_rows = n_rows_x*n_rows_y
+    for i in range(n_rows):
+        shelf_rows.append(ShelfRow([]))
+
+    x_size = (n_shelves_in_row + 1) * n_rows_x + 1 # This seems weirdly defined
+    y_size = n_rows_y * 2 # + 1 on the comment above 
+    
+    for j in range(n_rows_x):
+        for i in range((n_shelves_in_row + 1)*j+1, (n_shelves_in_row + 1)*(j+1)):
+            l = 0
+            for k in range(y_size):
+                if k % 4 in [0, 3]:
+                    aisle_locations.append((k,i))
+                    
+                # elif k % 4 == 2 and k == n_rows_y - 1: 
+                #     aisle_locations.append((k,i))
+
+                else:
+                    shelf = Shelf((k,i))
+                    shelves.append(shelf)
+                    shelf_rows[n_rows_y*j+l].add(shelf)
+                    l += 1
+
+            
+    for row in shelf_rows:
+        for shelf in row.shelves:
+            shelf.height = shelf_height
+            shelf.shelf_row = row
+
+    layout = Layout(shape=(y_size, x_size), 
+                    depot_location=depot_location, 
+                    initial_shelves=shelves, 
+                    shelf_rows=shelf_rows, 
+                    aisle_locations=aisle_locations, 
+                    bin_size=1)
+
+    layout.shelves.sort(key=lambda x: layout.distances[layout.depot_location][x.pick_location])
+
+    layout.find_shelves_closest_to_depot()  
+
+    layout_file = open(layout_path, "wb")
+    pickle.dump(layout, layout_file)
+    layout_file.close()
